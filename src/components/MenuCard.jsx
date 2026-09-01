@@ -1,7 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-function MenuCard({ dish, onAddToCart }) {
+function MenuCard({ dish, onAddToCart, openDetailsDish, onDetailsOpened }) {
   const [showAI, setShowAI] = useState(false);
+
+  // Open details when AI recommendation sends this dish
+  useEffect(() => {
+    if (openDetailsDish && openDetailsDish.id === dish.id) {
+      setShowAI(true);
+
+      if (onDetailsOpened) {
+        onDetailsOpened();
+      }
+    }
+  }, [openDetailsDish, dish.id, onDetailsOpened]);
 
   const getSpiceText = () => {
     if (dish.spiceLevel === 0) return "😌 Not Spicy";
@@ -23,7 +34,6 @@ function MenuCard({ dish, onAddToCart }) {
             className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
           />
 
-          {/* Veg / Non-Veg */}
           <div className="absolute left-3 top-3">
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -36,7 +46,6 @@ function MenuCard({ dish, onAddToCart }) {
             </span>
           </div>
 
-          {/* Price */}
           <div className="absolute right-3 top-3 rounded-full bg-white px-3 py-1 font-bold text-orange-600 shadow">
             {dish.price}
           </div>
@@ -52,7 +61,6 @@ function MenuCard({ dish, onAddToCart }) {
             {dish.description}
           </p>
 
-          {/* Spice */}
           <div className="mt-4 flex items-center justify-between">
             <span className="text-sm font-medium text-gray-600">
               Spice Level
@@ -63,7 +71,6 @@ function MenuCard({ dish, onAddToCart }) {
             </span>
           </div>
 
-          {/* Cooking */}
           <div className="mt-3 flex items-center justify-between text-sm">
             <span className="text-gray-500">
               Cooking
@@ -74,10 +81,7 @@ function MenuCard({ dish, onAddToCart }) {
             </span>
           </div>
 
-          {/* Buttons */}
           <div className="mt-5 grid grid-cols-2 gap-3">
-
-            {/* Ask AI */}
             <button
               onClick={() => setShowAI(true)}
               className="rounded-xl bg-orange-500 py-3 font-semibold text-white shadow-sm transition hover:bg-orange-600"
@@ -85,19 +89,17 @@ function MenuCard({ dish, onAddToCart }) {
               ✨ Ask AI
             </button>
 
-            {/* Add to Order */}
             <button
               onClick={() => onAddToCart(dish)}
               className="rounded-xl border border-orange-200 bg-orange-50 py-3 font-semibold text-orange-600 transition hover:bg-orange-100"
             >
               🛒 Add to Order
             </button>
-
           </div>
         </div>
       </div>
 
-      {/* ================= AI POPUP ================= */}
+      {/* ================= DETAILS POPUP ================= */}
       {showAI && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
 
@@ -128,7 +130,7 @@ function MenuCard({ dish, onAddToCart }) {
               </div>
             </div>
 
-            {/* Dish Image */}
+            {/* Image */}
             <div className="h-56 overflow-hidden">
               <img
                 src={dish.image}
@@ -140,7 +142,6 @@ function MenuCard({ dish, onAddToCart }) {
             {/* Information */}
             <div className="p-6">
 
-              {/* Name + Price */}
               <div className="flex items-start justify-between gap-4">
 
                 <h2 className="text-2xl font-bold text-gray-800">
@@ -153,12 +154,10 @@ function MenuCard({ dish, onAddToCart }) {
 
               </div>
 
-              {/* Description */}
               <p className="mt-3 leading-6 text-gray-500">
                 {dish.description}
               </p>
 
-              {/* Type + Spice */}
               <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
 
                 <div className="rounded-2xl bg-green-50 p-4">
@@ -207,6 +206,7 @@ function MenuCard({ dish, onAddToCart }) {
 
               {/* Taste */}
               <div className="mt-6">
+
                 <h3 className="font-bold text-gray-800">
                   😋 Taste
                 </h3>
@@ -214,6 +214,7 @@ function MenuCard({ dish, onAddToCart }) {
                 <p className="mt-2 text-gray-600">
                   {dish.taste.join(", ")}
                 </p>
+
               </div>
 
               {/* Cooking */}
@@ -229,10 +230,20 @@ function MenuCard({ dish, onAddToCart }) {
 
               </div>
 
-              {/* Done */}
+              {/* Add directly from details */}
+              <button
+                onClick={() => {
+                  onAddToCart(dish);
+                  setShowAI(false);
+                }}
+                className="mt-6 w-full rounded-xl border border-orange-200 bg-orange-50 py-3 font-bold text-orange-600 transition hover:bg-orange-100"
+              >
+                🛒 Add to Order
+              </button>
+
               <button
                 onClick={() => setShowAI(false)}
-                className="mt-6 w-full rounded-xl bg-orange-500 py-3 font-bold text-white transition hover:bg-orange-600"
+                className="mt-3 w-full rounded-xl bg-orange-500 py-3 font-bold text-white transition hover:bg-orange-600"
               >
                 Done
               </button>
