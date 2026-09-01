@@ -1,8 +1,7 @@
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 
 function AIChatBox({ menuData, onViewDetails }) {
   const [question, setQuestion] = useState("");
-
   const [answer, setAnswer] = useState(
     "👋 Hi! I’m SmartMenu AI. Tell me what you feel like eating, and I’ll help you choose something delicious!"
   );
@@ -11,28 +10,6 @@ function AIChatBox({ menuData, onViewDetails }) {
   const [isListening, setIsListening] = useState(false);
 
   const recognitionRef = useRef(null);
-
-  // ==============================
-  // AI VOICE RESPONSE
-  // ONLY RUNS WHEN 🔊 BUTTON IS CLICKED
-  // ==============================
-
-  const speakAnswer = (text) => {
-    if (!("speechSynthesis" in window)) {
-      return;
-    }
-
-    // Stop any previous speech first
-    window.speechSynthesis.cancel();
-
-    const speech = new SpeechSynthesisUtterance(text);
-
-    speech.rate = 0.95;
-    speech.pitch = 1;
-    speech.volume = 1;
-
-    window.speechSynthesis.speak(speech);
-  };
 
   // ==============================
   // SPICE LEVEL
@@ -46,7 +23,7 @@ function AIChatBox({ menuData, onViewDetails }) {
   };
 
   // ==============================
-  // FIND AI RECOMMENDATIONS
+  // FIND RECOMMENDATIONS
   // ==============================
 
   const findRecommendations = (query) => {
@@ -114,15 +91,15 @@ function AIChatBox({ menuData, onViewDetails }) {
       lowerQuestion.includes("sweet") ||
       lowerQuestion.includes("dessert")
     ) {
-      const sweetItems = results.filter(
+      const dessertItems = results.filter(
         (dish) =>
           dish.category === "Dessert" ||
           dish.name.toLowerCase().includes("ice cream") ||
           dish.name.toLowerCase().includes("gulab")
       );
 
-      if (sweetItems.length > 0) {
-        results = sweetItems;
+      if (dessertItems.length > 0) {
+        results = dessertItems;
       }
     }
 
@@ -140,7 +117,7 @@ function AIChatBox({ menuData, onViewDetails }) {
       }
     }
 
-    // MILD / NOT SPICY
+    // MILD
     if (
       lowerQuestion.includes("mild") ||
       lowerQuestion.includes("not spicy") ||
@@ -159,29 +136,25 @@ function AIChatBox({ menuData, onViewDetails }) {
   };
 
   // ==============================
-  // ASK AI
+  // PROCESS AI QUESTION
   // ==============================
 
   const handleAsk = (customQuestion = null) => {
     const currentQuestion = customQuestion || question;
 
-    if (!currentQuestion.trim()) return;
+    if (!currentQuestion.trim()) {
+      return;
+    }
 
     const q = currentQuestion.toLowerCase().trim();
 
-    // Stop any previously playing AI voice.
-    // IMPORTANT: This does NOT start a new voice.
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-
-    // FIND EXACT DISH
+    // Find exact dish
     const exactDish = menuData.find((dish) =>
       q.includes(dish.name.toLowerCase())
     );
 
     // ==============================
-    // EXACT DISH FOUND
+    // EXACT DISH
     // ==============================
 
     if (exactDish) {
@@ -234,7 +207,7 @@ function AIChatBox({ menuData, onViewDetails }) {
 
       // GENERAL
       else {
-        response = `✨ ${exactDish.name} is ${exactDish.description} It costs ${exactDish.price} and has a ${getSpiceText(
+        response = `✨ ${exactDish.name}: ${exactDish.description} It costs ${exactDish.price} and has a ${getSpiceText(
           exactDish.spiceLevel
         )} spice level.`;
       }
@@ -243,25 +216,22 @@ function AIChatBox({ menuData, onViewDetails }) {
       setRecommendedDishes([exactDish]);
       setQuestion("");
 
-      // NO AUTOMATIC AI SPEAKING HERE
-
       return;
     }
 
     // ==============================
-    // AI RECOMMENDATIONS
+    // RECOMMENDATIONS
     // ==============================
 
     const recommendations = findRecommendations(q);
 
     if (recommendations.length === 0) {
-      const response =
-        "🤔 I couldn't find a perfect match. Try asking for spicy chicken, vegetarian food, traditional Indian food, rice items, or desserts.";
+      setAnswer(
+        "🤔 I couldn't find a perfect match. Try asking for traditional Indian food, chicken, vegetarian food, rice items, spicy food, or desserts."
+      );
 
-      setAnswer(response);
       setRecommendedDishes([]);
-
-      // NO AUTOMATIC AI SPEAKING HERE
+      setQuestion("");
 
       return;
     }
@@ -270,23 +240,33 @@ function AIChatBox({ menuData, onViewDetails }) {
       .map((dish) => dish.name)
       .join(" and ");
 
-    const response = `✨ Based on what you're looking for, I recommend ${dishNames}. Please check the recommendations below and view the full details of any dish you like.`;
+    setAnswer(
+      `✨ Based on what you're looking for, I recommend ${dishNames}. Please check the recommendations below and view the full details of any dish you like.`
+    );
 
-    setAnswer(response);
     setRecommendedDishes(recommendations);
     setQuestion("");
-
-    // NO AUTOMATIC AI SPEAKING HERE
   };
 
   // ==============================
-  // START VOICE LISTENING
+  // STOP LISTENING
+  // ==============================
+
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+
+    setIsListening(false);
+  };
+
+  // ==============================
+  // VOICE INPUT ONLY
   // ==============================
 
   const startListening = () => {
-    // Stop listening if already listening
-    if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
+    if (isListening) {
+      stopListening();
       return;
     }
 
@@ -306,11 +286,11 @@ function AIChatBox({ menuData, onViewDetails }) {
     recognitionRef.current = recognition;
 
     recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.interimResults = false;
     recognition.lang = "en-IN";
 
     let finalTranscript = "";
-    let silenceTimer;
+    let silenceTimer = null;
 
     recognition.onstart = () => {
       setIsListening(true);
@@ -318,59 +298,76 @@ function AIChatBox({ menuData, onViewDetails }) {
     };
 
     recognition.onresult = (event) => {
-      let interimTranscript = "";
+      let newFinalText = "";
 
       for (
         let i = event.resultIndex;
         i < event.results.length;
         i++
       ) {
-        const transcript =
-          event.results[i][0].transcript;
-
         if (event.results[i].isFinal) {
-          finalTranscript += transcript + " ";
-        } else {
-          interimTranscript += transcript;
+          newFinalText +=
+            event.results[i][0].transcript + " ";
         }
       }
 
-      const completeText =
-        finalTranscript + interimTranscript;
+      if (newFinalText.trim()) {
+        finalTranscript =
+          `${finalTranscript} ${newFinalText}`.trim();
 
-      setQuestion(completeText);
+        setQuestion(finalTranscript);
 
-      clearTimeout(silenceTimer);
+        // Give customer time to breathe
+        clearTimeout(silenceTimer);
 
-      silenceTimer = setTimeout(() => {
-        if (recognitionRef.current) {
-          recognitionRef.current.stop();
-        }
-      }, 2500);
+        silenceTimer = setTimeout(() => {
+          if (recognitionRef.current) {
+            recognitionRef.current.stop();
+          }
+        }, 2500);
+      }
     };
 
-    recognition.onerror = () => {
-      setIsListening(false);
+    recognition.onerror = (event) => {
+      console.log(
+        "Speech recognition error:",
+        event.error
+      );
+
       clearTimeout(silenceTimer);
+      setIsListening(false);
+      recognitionRef.current = null;
     };
 
     recognition.onend = () => {
-      setIsListening(false);
       clearTimeout(silenceTimer);
+
+      setIsListening(false);
+      recognitionRef.current = null;
 
       const spokenText = finalTranscript.trim();
 
       if (spokenText) {
         setQuestion(spokenText);
 
-        // Automatically get the recommendation as TEXT ONLY
+        // Process as TEXT ONLY
         setTimeout(() => {
           handleAsk(spokenText);
         }, 300);
       }
     };
 
-    recognition.start();
+    try {
+      recognition.start();
+    } catch (error) {
+      console.log(
+        "Speech recognition could not start:",
+        error
+      );
+
+      setIsListening(false);
+      recognitionRef.current = null;
+    }
   };
 
   // ==============================
@@ -385,58 +382,65 @@ function AIChatBox({ menuData, onViewDetails }) {
 
   return (
     <section className="mb-10">
+
       <div className="rounded-3xl border border-white/40 bg-white/60 p-6 shadow-xl backdrop-blur-xl">
 
         {/* HEADER */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">
-              ✨ SmartMenu AI
-            </h2>
+        <div className="mb-6">
 
-            <p className="mt-1 text-gray-500">
-              Tell me what you feel like eating
-            </p>
-          </div>
+          <h2 className="text-2xl font-bold text-gray-800">
+            ✨ SmartMenu AI
+          </h2>
 
-          {/* THIS IS THE ONLY BUTTON THAT MAKES AI SPEAK */}
-          <button
-            onClick={() => speakAnswer(answer)}
-            className="rounded-full bg-orange-100 px-4 py-3 text-lg transition hover:bg-orange-200"
-            title="Listen to AI answer"
-          >
-            🔊
-          </button>
+          <p className="mt-1 text-gray-500">
+            Tell me what you feel like eating
+          </p>
+
         </div>
+
 
         {/* AI ANSWER */}
         <div className="rounded-3xl border border-orange-100 bg-white/70 p-5 shadow-sm backdrop-blur-md">
+
           <p className="leading-7 text-gray-700">
             {answer}
           </p>
+
         </div>
+
 
         {/* RECOMMENDATIONS */}
         {recommendedDishes.length > 0 && (
+
           <div className="mt-6">
+
             <h3 className="mb-4 text-lg font-bold text-gray-800">
               🍽️ Recommended for You
             </h3>
 
+
             <div className="grid gap-4 sm:grid-cols-2">
+
               {recommendedDishes.map((dish) => (
+
                 <div
                   key={dish.id}
                   className="overflow-hidden rounded-3xl border border-orange-100 bg-white shadow-md"
                 >
+
+                  {/* IMAGE */}
                   <img
                     src={dish.image}
                     alt={dish.name}
                     className="h-40 w-full object-cover"
                   />
 
+
+                  {/* INFO */}
                   <div className="p-4">
+
                     <div className="flex items-start justify-between gap-3">
+
                       <h4 className="text-lg font-bold text-gray-800">
                         {dish.name}
                       </h4>
@@ -444,13 +448,18 @@ function AIChatBox({ menuData, onViewDetails }) {
                       <span className="whitespace-nowrap font-bold text-orange-600">
                         {dish.price}
                       </span>
+
                     </div>
+
 
                     <p className="mt-2 text-sm text-gray-500">
                       {dish.description}
                     </p>
 
+
+                    {/* SPICE */}
                     <div className="mt-3 flex items-center justify-between text-sm">
+
                       <span className="text-gray-500">
                         Spice Level
                       </span>
@@ -458,28 +467,40 @@ function AIChatBox({ menuData, onViewDetails }) {
                       <span className="font-medium text-gray-700">
                         {getSpiceText(dish.spiceLevel)}
                       </span>
+
                     </div>
 
+
+                    {/* VIEW DETAILS */}
                     <button
                       onClick={() => handleViewDetails(dish)}
                       className="mt-4 w-full rounded-xl bg-orange-500 py-3 font-semibold text-white transition hover:bg-orange-600"
                     >
                       👀 View Full Details
                     </button>
+
                   </div>
+
                 </div>
+
               ))}
+
             </div>
+
           </div>
+
         )}
 
-        {/* INPUT AREA */}
+
+        {/* INPUT */}
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
 
           <input
             type="text"
             value={question}
-            onChange={(e) => setQuestion(e.target.value)}
+            onChange={(e) =>
+              setQuestion(e.target.value)
+            }
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 handleAsk();
@@ -489,7 +510,8 @@ function AIChatBox({ menuData, onViewDetails }) {
             className="flex-1 rounded-2xl border border-orange-200 bg-white/80 px-5 py-4 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200"
           />
 
-          {/* CUSTOMER SPEAKS - AI DOES NOT SPEAK */}
+
+          {/* SPEAK */}
           <button
             onClick={startListening}
             className={`rounded-2xl px-6 py-4 font-semibold transition ${
@@ -499,19 +521,31 @@ function AIChatBox({ menuData, onViewDetails }) {
             }`}
           >
             {isListening
-              ? "⏹ Stop Speaking"
+              ? "⏹ Stop"
               : "🎤 Speak"}
           </button>
 
-          {/* TEXT ANSWER */}
+
+          {/* ASK */}
           <button
-            onClick={() => handleAsk()}
+            onClick={handleAsk}
             className="rounded-2xl bg-orange-500 px-8 py-4 font-semibold text-white transition hover:bg-orange-600"
           >
             Ask ✨
           </button>
+
         </div>
+
+
+        {/* LISTENING STATUS */}
+        {isListening && (
+          <p className="mt-3 text-center text-sm font-medium text-red-500">
+            🎙️ Listening... Speak naturally. I'll wait for you to finish.
+          </p>
+        )}
+
       </div>
+
     </section>
   );
 }
